@@ -1,0 +1,87 @@
+GO
+CREATE FUNCTION [dbo].[func_CommonValuesForDateTime_TVF] (@DateTime	DATETIME = NULL)
+RETURNS	TABLE WITH SCHEMABINDING
+AS
+RETURN
+(	SELECT	TOP(1)
+			--This outermost SELECT exists only to allow for easy re-organization, or removal, of the output columns
+      --@DateTime defaults to GETDATE() if NULL
+			[Now],
+			[Second],		[SecondLast],		[SecondNext],
+			[Minute],		[MinuteLast],		[MinuteNext],
+			[QuarterHour],	[QuarterHourLast],	[QuarterHourNext],
+			[HalfHour],		[HalfHourLast],		[HalfHourNext],
+			[Hour],			[HourLast],			[HourNext],
+			[Today],		[Yesterday],		[Tomorrow],
+			[Week],			[WeekLast],			[WeekNext],
+			[Month],		[MonthLast],		[MonthNext],
+			[Quarter],		[QuarterLast],		[QuarterNext],
+			[Year],			[YearLast],			[YearNext],
+			[Decade],		[DecadeLast],		[DecadeNext],
+			[Century],		[CenturyLast],		[CenturyNext],
+			[ThisSecond],	[ThisMinute],		[ThisHour],
+			[ThisDay],		[ThisDayOfYear],	[ThisWeekDay],
+			[ThisWeek],		[ThisMonth],		[ThisQuarter],
+			[ThisYear],		[IsAM]
+	  FROM	(	SELECT	CAST((CASE WHEN ([Now] < DATEADD(HOUR, 12, [Today])) THEN 1 ELSE 0 END) AS BIT)			AS [IsAM],
+						DATEADD(SECOND,		(DATEDIFF(SECOND,	[Today], [Now]) + 0), [Today])					AS [Second],
+						DATEADD(SECOND,		(DATEDIFF(SECOND,	[Today], [Now]) - 1), [Today])					AS [SecondLast],
+						DATEADD(SECOND,		(DATEDIFF(SECOND,	[Today], [Now]) + 1), [Today])					AS [SecondNext],
+						DATEADD(MINUTE,		(DATEDIFF(MINUTE,	[Today], [Now]) + 0), [Today])					AS [Minute],
+						DATEADD(MINUTE,		(DATEDIFF(MINUTE,	[Today], [Now]) - 1), [Today])					AS [MinuteLast],
+						DATEADD(MINUTE,		(DATEDIFF(MINUTE,	[Today], [Now]) + 1), [Today])					AS [MinuteNext],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 15) + 0) * 15),	[Today])	AS [QuarterHour],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 15) - 1) * 15),	[Today])	AS [QuarterHourLast],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 15) + 1) * 15),	[Today])	AS [QuarterHourNext],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 30) + 0) * 30),	[Today])	AS [HalfHour],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 30) - 1) * 30),	[Today])	AS [HalfHourLast],
+						DATEADD(MINUTE,		(((DATEDIFF(MINUTE,	[Today], [Now])	/ 30) + 1) * 30),	[Today])	AS [HalfHourNext],
+						DATEADD(HOUR,		(DATEDIFF(HOUR,		[Today], [Now]) + 0), [Today])					AS [Hour],
+						DATEADD(HOUR,		(DATEDIFF(HOUR,		[Today], [Now]) - 1), [Today])					AS [HourLast],
+						DATEADD(HOUR,		(DATEDIFF(HOUR,		[Today], [Now]) + 1), [Today])					AS [HourNext],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 10) + 0) * 10),	0)						AS [Decade],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 10) - 1) * 10),	0)						AS [DecadeLast],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 10) + 1) * 10),	0)						AS [DecadeNext],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 100) + 0) * 100),	0)					AS [Century],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 100) - 1) * 100),	0)					AS [CenturyLast],
+						DATEADD(YEAR,		(((([ThisYear] - YEAR(0)) / 100) + 1) * 100),	0)					AS [CenturyNext],
+						[Now],				[Today],		[Yesterday],	[Tomorrow],
+						[ThisSecond],		[ThisMinute],	[ThisHour],		[ThisDay],
+						[ThisDayOfYear],	[ThisWeekDay],	[ThisWeek],		[ThisWeekISO],
+						[ThisMonth],		[ThisQuarter],	[ThisYear],
+						[Week],				[WeekLast],		[WeekNext],
+						[Month],			[MonthLast],	[MonthNext],
+						[Quarter],			[QuarterLast],	[QuarterNext],
+						[Year],				[YearLast],		[YearNext]
+				  FROM	(	SELECT	[Input].[Now]															AS [Now],
+									DATEADD(DAY,		(DATEDIFF(DAY,		0, [Input].[Now]) + 0), 0)		AS [Today],
+									DATEADD(DAY,		(DATEDIFF(DAY,		0, [Input].[Now]) - 1), 0)		AS [Yesterday],
+									DATEADD(DAY,		(DATEDIFF(DAY,		0, [Input].[Now]) + 1), 0)		AS [Tomorrow],
+									DATEADD(WEEK,		(DATEDIFF(WEEK,		0, [Input].[Now]) + 0), 0)		AS [Week],
+									DATEADD(WEEK,		(DATEDIFF(WEEK,		0, [Input].[Now]) - 1), 0)		AS [WeekLast],
+									DATEADD(WEEK,		(DATEDIFF(WEEK,		0, [Input].[Now]) + 1), 0)		AS [WeekNext],
+									DATEADD(MONTH,		(DATEDIFF(MONTH,	0, [Input].[Now]) + 0), 0)		AS [Month],
+									DATEADD(MONTH,		(DATEDIFF(MONTH,	0, [Input].[Now]) - 1), 0)		AS [MonthLast],
+									DATEADD(MONTH,		(DATEDIFF(MONTH,	0, [Input].[Now]) + 1), 0)		AS [MonthNext],
+									DATEADD(QUARTER,	(DATEDIFF(QUARTER,	0, [Input].[Now]) + 0), 0)		AS [Quarter],
+									DATEADD(QUARTER,	(DATEDIFF(QUARTER,	0, [Input].[Now]) - 1), 0)		AS [QuarterLast],
+									DATEADD(QUARTER,	(DATEDIFF(QUARTER,	0, [Input].[Now]) + 1), 0)		AS [QuarterNext],
+									DATEADD(YEAR,		(DATEDIFF(YEAR,		0, [Input].[Now]) + 0), 0)		AS [Year],
+									DATEADD(YEAR,		(DATEDIFF(YEAR,		0, [Input].[Now]) - 1), 0)		AS [YearLast],
+									DATEADD(YEAR,		(DATEDIFF(YEAR,		0, [Input].[Now]) + 1), 0)		AS [YearNext],
+									DATEPART(SECOND,	[Input].[Now])										AS [ThisSecond],
+									DATEPART(MINUTE,	[Input].[Now])										AS [ThisMinute],
+									DATEPART(HOUR,		[Input].[Now])										AS [ThisHour],
+									DATEPART(DAY,		[Input].[Now])										AS [ThisDay],
+									DATEPART(DAYOFYEAR,	[Input].[Now])										AS [ThisDayOfYear],
+									DATEPART(WEEKDAY,	[Input].[Now])										AS [ThisWeekDay],
+									DATEPART(WEEK,		[Input].[Now])										AS [ThisWeek],
+									DATEPART(ISO_WEEK,	[Input].[Now])										AS [ThisWeekISO],
+									DATEPART(MONTH,		[Input].[Now])										AS [ThisMonth],
+									DATEPART(QUARTER,	[Input].[Now])										AS [ThisQuarter],
+									DATEPART(YEAR,		[Input].[Now])										AS [ThisYear]
+							  FROM	(	SELECT	COALESCE(@DateTime, GETDATE()) AS [Now])	AS [Input]
+						)	AS [MajorParts]
+			)	AS [AggregateParts]
+)
+GO
