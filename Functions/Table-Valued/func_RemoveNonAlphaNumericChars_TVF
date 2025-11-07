@@ -1,0 +1,54 @@
+GO
+CREATE FUNCTION [dbo].[func_RemoveNonAlphaNumericChars_TVF] (@InputString NVARCHAR(4000))
+RETURNS TABLE WITH SCHEMABINDING
+AS
+RETURN	(
+	/*	
+		@InputString is limited to NVARCHAR(4000) for performance reasons.
+		@InputString may be reduced to NVARCHAR(256), or similar.
+		@InputString may be reduced to VARCHAR(256), or similar.
+		If @InputString is reduced, the value of NVARCHAR(4000) must also be reduced throughout the function
+		to match the input parameter.
+		If @InputString is reduced, the number of SELECT statements in [cte_func_GetSeedRows] should be reduced to match, or
+		to exceed only minimally.
+	*/
+	WITH	[cte_func_GetSeedRows] ([SeedValue])				AS	(	SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	--4 Rows
+																		SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	--4 Rows
+																		SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	--4 Rows
+																		SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1 UNION ALL	SELECT 1			--4 Rows (Exactly 16 Rows Total)
+																	),
+			[cte_func_GetCharIndexRangeFromString] ([Index])	AS	(	/*
+																			We need to cross join [cte_func_GetSeedRows] onto itself enough times to result in a number of rows
+																			that meets, or exceeds, the character count that can be stored in @InputString.
+																			If @InputString is an NVARCHAR(4000),	then we must have at least 4,000 rows.
+																			If @InputString is an VARCHAR(8000), 	then we must have at least 8,000 rows.
+																			If @InputString is an NVARCHAR(128), 	then we must have at least 128 rows.
+																			If @InputString is an VARCHAR(128), 	then we must have at least 128 rows.
+																			Note that we are NOT trying to return enough rows to cover the DATALENGTH of @InputString, just the character count
+																		*/
+																		SELECT	TOP(LEN(@InputString)) ROW_NUMBER() OVER (ORDER BY (SELECT NULL))	--Of the 4,096 Rows Generated, Only Return What Is Needed For @InputString and return the ROW_NUMBER() as the index itself by using a dummy sort on the ROW_NUMBER() function.
+																		  FROM	[cte_func_GetSeedRows]	AS [SeedRowsBase]	--Takes 16 Seed Rows
+																	CROSS JOIN	[cte_func_GetSeedRows]	AS [SeedRowsMult01]	--And Expands Each Row By 16 More Seed Rows For 256 Rows (16x16)
+																	CROSS JOIN	[cte_func_GetSeedRows]	AS [SeedRowsMult02]	--And Expands Each Row Again By 16 More Seed Rows For 4,096 Rows (16x16x16)
+																	)
+			/*
+				Use the indices generated in [cte_func_GetCharIndexRangeFromString] to quickly check every character within @InputString
+				Utilize the XML PATH to quickly concatenate each row back into an output string
+				--
+				Note:	The XML keywords, such as 'value' and 'text', must be in LOWERCASE or they may not compile/execute.
+				Note:	Some SQL Parsers, or Syntax Highlighters, may show a "red squiggle" near the [cte_func_ConcatenateStringByIndex] column name
+						within the nested SELECT. This is a false positive and is not an error.
+			*/
+			SELECT	(CASE	WHEN @InputString = N''		THEN N''
+							WHEN @InputString IS NULL	THEN NULL
+							ELSE (	SELECT	[cte_func_ConcatenateStringByIndex].[AlphaNumericString].value('(./text())[1]', 'NVARCHAR(4000)')
+									  FROM	(	SELECT	(CASE	WHEN	--If the character at the current index is not a letter or a number, replace it with an empty string
+																		SUBSTRING(@InputString, [InputStringIndexRange].[Index], 1) LIKE N'[a-z0-9]' COLLATE Latin1_General_CI_AI	--Latin1_General_CI_AI:	[CI]=Case-Insensitive, [AI]=Accent Insensitive, This means that 'a' is distinct from 'A' and that 'e' is distinct from 'E' and both 'e' and 'E' are distinct from 'é' and 'É'.
+																THEN	SUBSTRING(@InputString, [InputStringIndexRange].[Index], 1)
+																ELSE	N'' END)
+												  FROM	[cte_func_GetCharIndexRangeFromString]	AS [InputStringIndexRange]
+												   FOR	XML PATH (N''), TYPE	--TYPE here indicates that the value returned using 'FOR XML' will be returned as an XML Datatype and NOT as an NVARCHAR(MAX) Datatype. Methods cannot be called on NVARCHAR(MAX) so this is necessary.
+											)	AS [cte_func_ConcatenateStringByIndex] ([AlphaNumericString])
+								) END) AS [String]
+)
+GO
